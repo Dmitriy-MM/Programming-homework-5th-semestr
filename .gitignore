@@ -1,0 +1,33 @@
+#ignore all binary files like *.out and *.exe
+*/**/*.out
+*/**/*.exe
+
+#ignore all objective files
+*.o
+
+#ignore large test files like "/tests/random_1e8.txt"
+*/**/*[1-9]e[6-9]*.txt
+
+#ignore all archives
+*/**/*.zip
+*/**/*.rar
+*/**/*.arj
+*/**/*.7z
+*/**/*.tar
+*/**/*.tar.gz
+
+#ignore test and result .txt files
+*/**/*test*.txt
+*/**/*res*.txt
+#and more - ignore all .txt files
+*/**/*.txt
+
+#but "tests/" catalog is good for us
+!*/**/tests/*
+
+#except myres*.txt
+*/**/*myres*.txt
+
+#ignore feature dev
+*/**/*feature*/*
+feature/*
