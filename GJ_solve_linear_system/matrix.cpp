@@ -92,7 +92,7 @@ fread_matrix (FILE *fp, double *arr, int n, int m)
   for (int i = 0; i < n; i++)
     {
       for (int j = 0; j < n; j++)
-        if ((fscanf (fp, "%lf", arr + get_pos_bs (i, j, n, m)) != 1) && (!feof (fp)))
+        if (fscanf (fp, "%lf", arr  + get_pos_bs (i, j, n, m)) != 1)
           {
             fprintf (stderr, "Can't read element i=%d, j=%d\n", i, j);
             return !0;

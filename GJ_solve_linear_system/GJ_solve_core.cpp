@@ -1,9 +1,11 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <cstring>
 #include <time.h>
 
 #include "GJ_solve.h"
+#include "matrix.h"
 #include "aux_matrix_funcs.h"
 #include "block_storage_aux_funcs.h"
 
@@ -60,7 +62,7 @@ reverse (double *A, double *B, int n, int dim, double eps = 1e-14)
               }
           if (k == dim)
             {
-              fprintf (stderr, "Can't reverse eps=%e, k = %d\n", eps, k);
+              //fprintf (stderr, "Can't reverse eps=%e, k = %d\n", eps, k);
               return !0;
             }
           i--;
@@ -99,25 +101,72 @@ solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, doub
   (void)void_arg;
   clock_t t, tt = 0;
 
+  int * seq = new int [k];
+  for (i = 0; i < k; i++)
+    seq[i] = i;
+
   if (r)
     k++;
   for (i = 0; i < k; i++)
     {
+      // Выбор главного элемента по строке.
+      double max_norm = 0;
+      int max = i;
+
       get_block (A, b1, i, i, n, m);
-      // Обращение диагонального элемента
       if (r && (k - 1 == i))
         ret = reverse (b1, b2, m, r, eps);
       else
         ret = reverse (b1, b2, m, eps);
+      int dim = n / m;
+      for (j = i + 1; j < dim; j++)
+        {
+          double *A_ij = A + get_shift_via_block_coords (i, j, k, n, m);
+          int ret_in;
+          get_block (A, b1, i, j, n, m);
+          ret_in = reverse (b1, b3, m, eps);
+          if (ret_in)
+            continue;
+          double norm = calc_matrix_norm_inf (A_ij, m, m);
+          if (norm > max_norm)
+            {
+              max_norm = norm;
+              memcpy (b2, b3, sizeof (double) * m * m);
+              max = j;
+              ret = ret_in;
+            }
+        }
 
       if (ret)
         {
           printf ("Can't solve via this method\n");
           return ret;
         }
-      // Дальше циклы раскрыты на цикл до k-1 и последующий if, чтобы, когда
-      // лежит целый блок m*m не копировать его в буфер, а работать прямо в
-      // памяти с матрицей.
+      if (i != max)
+        {
+          // Перестановка столбцов.
+          seq[i] = max;
+          seq[max] = i;
+
+          // Дальше циклы раскрыты на цикл до k-1 и последующий if, чтобы, когда
+          // лежит целый блок m*m не копировать его в буфер, а работать прямо в
+          // памяти с матрицей.
+          for (l = 0; l < k - 1; l++)
+            {
+              double * A_li = A + get_shift_via_block_coords (l, i, k, n, m);
+              double * A_lmax = A + get_shift_via_block_coords (l, max, k, n, m);
+              memcpy (b1, A_li, sizeof (double) * m * m); // сохранили li
+              memcpy (A_li, A_lmax, sizeof (double) * m * m); // записали lmax на li
+              memcpy (A_lmax, b1, sizeof (double) * m * m); // записали li на lmax
+            }
+          if (l < k)
+            {
+              get_block (A, b1, l, i, n, m);
+              get_block (A, b3, l, max, n, m);
+              set_block (A, b3, l, i, n, m);
+              set_block (A, b1, l, max, n, m);
+            } // for (l = 0; l < k - 1; l++)
+        }
 
       // В помеченных (*) циклах можно не работать со столбцом на диагонали,
       // так как он больше не нужен в решении, поэтому старт начинается с
@@ -205,6 +254,19 @@ solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, doub
           mult_block_on_vec_sub (b3, b_vec2, b_vec, m);
           set_block_vec (b_vec, B_vec, j, n, m);
         } // for (j = 0; j < k - 1; j++)
+    }
+
+  // Восстановление вектора после перестановок столбцов.
+  for (i = 0; i < k; i++)
+    {
+      for (j = i + 1; j < k; j++)
+        if (seq[i] != seq[j])
+          {
+            get_block_vec (B_vec, b_vec2, i, n, m);
+            get_block_vec (B_vec, b_vec, j, n, m);
+            set_block_vec (b_vec, B_vec, i, n, m);
+            set_block_vec (b_vec, B_vec, j, n, m);
+          }
     }
   fprintf (stderr, "mult_blocks_m & mult_blocks_m_sub elapsed time: %.2lfs\n", (double)tt / CLOCKS_PER_SEC);
   return 0;

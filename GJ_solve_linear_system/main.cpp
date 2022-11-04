@@ -151,7 +151,7 @@ main (int argc, char *argv[])
   if ((argc == 6) && (s == 0))
     {
       filename = argv[5];
-      if (st_init_matrix (A, n, n, filename))
+      if (st_init_matrix (A, n, m, filename))
         {
           printf ("%s : Task = %d Res1 = %e Res2 = %e T1 = %.2f T2 = %.2f S = "
                   "%d N = %d M = %d\n",
@@ -196,7 +196,7 @@ main (int argc, char *argv[])
   if ((argc == 6) && (s == 0))
     {
       filename = argv[5];
-      if (st_init_matrix (A, n, n, filename))
+      if (st_init_matrix (A, n, m, filename))
         return Read_error;
     }
   else
