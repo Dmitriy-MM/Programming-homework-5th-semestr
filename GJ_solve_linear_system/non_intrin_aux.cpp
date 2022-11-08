@@ -29,6 +29,8 @@ non_intrin_get_block_vec (double *A_src, double *dst, int i, int n, int m)
 {
   double *pA = A_src + i * m;
   int m_real = (n - i * m) < m ? n - i * m : m;
+  for (int t = 0; t < m; t++)
+    dst[t] = 0.;
   memcpy (dst, pA, sizeof (double) * m_real);
 }
 
@@ -51,8 +53,9 @@ void
 non_intrin_set_block_vec (double *A_src, double *dst, int i, int n, int m)
 {
   dst += i * m;
-  m = (n - i * m) < m ? n - i * m : m;
-  memcpy (dst, A_src, sizeof (double) * m);
+  double m_real = (n - i * m < m) ? n - i * m : m;
+  memcpy (dst, A_src, sizeof (double) * m_real);
+  
 }
 
 // Блок на вектор.

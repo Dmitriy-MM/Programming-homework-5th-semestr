@@ -12,16 +12,11 @@
 // В помеченных (*) циклах можно не работать со столбцом на диагонали,
 // так как он больше не нужен в решении, поэтому старт начинается с
 // индекса + 1, но можно плюс убрать - тогда ответ не изменится, программа
-// замедлится, но на вывод будет хорошая матрица, которая подразумевается
-// методом.
+// замедлится, но на вывод будет хорошая единичная матрица, которая
+// подразумевается методом.
 #define FORCE_SKIPING_DIAG (1)
-
-static void
-erase_vec (double *A, int n)
-{
-  for (int i = 0; i < n; i++)
-    A[i] = 0;
-}
+// С выбором главного элемента
+#define CHOOSING
 
 static void
 init_E_matrix (double *A, int n, int dim = -1)
@@ -43,7 +38,6 @@ reverse (double *A, double *B, int n, int dim, double eps = 1e-14)
   init_E_matrix (B, n, dim);
   for (int i = 0; i < dim; i++)
     {
-
       if (fabs (A[i * (n + 1)]) > eps)
         {
           double c = A[i * (n + 1)];
@@ -60,7 +54,7 @@ reverse (double *A, double *B, int n, int dim, double eps = 1e-14)
                   A[i * n + s] += A[k * n + s], B[i * n + s] += B[k * n + s];
                 break;
               }
-          if (k == dim)
+          if (k >= dim)
             {
               //fprintf (stderr, "Can't reverse eps=%e, k = %d\n", eps, k);
               return !0;
@@ -90,63 +84,67 @@ reverse (double *A, double *B, int n, double eps)
 }
 
 static int
-solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, double *b2, double *b3, double *b_vec, double *b_vec2, int void_arg)
+solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *vec_buf, double *b1, double *b2, double *b3, double *b_vec, double *b_vec2, int * seq, int void_arg)
 {
-  const double eps = norma * 1e-14;
+  // Если сделать 1e-17 начнет обращать вырожденные матрицы.
+  const double eps = norma * 1e-16; 
   int k = n / m;
   int r = n % m;
   int i, j, l;
   int ret;
-  (void)erase_vec;
   (void)void_arg;
+  (void)vec_buf;
   clock_t t, tt = 0;
-
-  int * seq = new int [k];
-  for (i = 0; i < k; i++)
-    seq[i] = i;
 
   if (r)
     k++;
   for (i = 0; i < k; i++)
     {
+
       // Выбор главного элемента по строке.
-      double max_norm = 0;
-      int max = i;
+#ifdef CHOOSING
+      double min_norm = norma + 1;
+      int dim = n / m;
+#endif
+      int min = i;
 
       get_block (A, b1, i, i, n, m);
       if (r && (k - 1 == i))
         ret = reverse (b1, b2, m, r, eps);
       else
         ret = reverse (b1, b2, m, eps);
-      int dim = n / m;
+
+#ifdef CHOOSING
+      if (!ret)
+        min_norm = calc_matrix_norm_inf (b2, m, m);
       for (j = i + 1; j < dim; j++)
         {
-          double *A_ij = A + get_shift_via_block_coords (i, j, k, n, m);
           int ret_in;
           get_block (A, b1, i, j, n, m);
           ret_in = reverse (b1, b3, m, eps);
           if (ret_in)
             continue;
-          double norm = calc_matrix_norm_inf (A_ij, m, m);
-          if (norm > max_norm)
+          double norm = calc_matrix_norm_inf (b3, m, m);
+          if (norm <= min_norm)
             {
-              max_norm = norm;
+              min_norm = norm;
               memcpy (b2, b3, sizeof (double) * m * m);
-              max = j;
+              min = j;
               ret = ret_in;
             }
         }
-
+#endif
       if (ret)
         {
           printf ("Can't solve via this method\n");
           return ret;
         }
-      if (i != max)
+      if (i != min)
         {
           // Перестановка столбцов.
-          seq[i] = max;
-          seq[max] = i;
+          int t = seq[i];
+          seq[i] = seq[min];
+          seq[min] = t;
 
           // Дальше циклы раскрыты на цикл до k-1 и последующий if, чтобы, когда
           // лежит целый блок m*m не копировать его в буфер, а работать прямо в
@@ -154,17 +152,17 @@ solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, doub
           for (l = 0; l < k - 1; l++)
             {
               double * A_li = A + get_shift_via_block_coords (l, i, k, n, m);
-              double * A_lmax = A + get_shift_via_block_coords (l, max, k, n, m);
+              double * A_lmin = A + get_shift_via_block_coords (l, min, k, n, m);
               memcpy (b1, A_li, sizeof (double) * m * m); // сохранили li
-              memcpy (A_li, A_lmax, sizeof (double) * m * m); // записали lmax на li
-              memcpy (A_lmax, b1, sizeof (double) * m * m); // записали li на lmax
+              memcpy (A_li, A_lmin, sizeof (double) * m * m); // записали lmin на li
+              memcpy (A_lmin, b1, sizeof (double) * m * m); // записали li на lmin
             }
           if (l < k)
             {
               get_block (A, b1, l, i, n, m);
-              get_block (A, b3, l, max, n, m);
+              get_block (A, b3, l, min, n, m);
               set_block (A, b3, l, i, n, m);
-              set_block (A, b1, l, max, n, m);
+              set_block (A, b1, l, min, n, m);
             } // for (l = 0; l < k - 1; l++)
         }
 
@@ -241,8 +239,7 @@ solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, doub
           for (l = i + FORCE_SKIPING_DIAG; l < k; l++) // (*)
             {
               get_block (A, b1, j, l, n, m); // строка из которой вычитается
-              get_block (A, b2, i, l, n,
-                         m); // вычитаемая строка без домножения
+              get_block (A, b2, i, l, n, m); // вычитаемая строка без домножения
               t = clock ();
               mult_blocks_m_sub (b3, b2, b1, m);
               t = clock () - t;
@@ -255,19 +252,15 @@ solve_GJ (int n, int m, double norma, double *A, double *B_vec, double *b1, doub
           set_block_vec (b_vec, B_vec, j, n, m);
         } // for (j = 0; j < k - 1; j++)
     }
-
+#ifdef CHOOSING
   // Восстановление вектора после перестановок столбцов.
   for (i = 0; i < k; i++)
-    {
-      for (j = i + 1; j < k; j++)
-        if (seq[i] != seq[j])
-          {
-            get_block_vec (B_vec, b_vec2, i, n, m);
-            get_block_vec (B_vec, b_vec, j, n, m);
-            set_block_vec (b_vec, B_vec, i, n, m);
-            set_block_vec (b_vec, B_vec, j, n, m);
-          }
-    }
+  {
+    get_block_vec (B_vec, b_vec, i, n, m);
+    set_block_vec (b_vec, vec_buf, seq[i], n, m);
+  }
+  memcpy (B_vec, vec_buf, sizeof(double) * n);
+#endif
   fprintf (stderr, "mult_blocks_m & mult_blocks_m_sub elapsed time: %.2lfs\n", (double)tt / CLOCKS_PER_SEC);
   return 0;
 }

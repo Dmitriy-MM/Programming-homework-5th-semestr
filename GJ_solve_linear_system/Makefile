@@ -1,14 +1,14 @@
-WINDOWS_FLAGS = -g -O0 -W -Wall -Wunused -Wcast-align -Werror -pedantic -pedantic-errors  -Wfloat-equal -Wpointer-arith -Wwrite-strings -Wno-long-long -Wmissing-declarations
+COMPILER = g++ 
 
-
-ERRORS_PRE_COMPILE = -W -Wall -Wextra -Wunused -Wcast-align -Werror -pedantic -pedantic-errors -Wfloat-equal -Wpointer-arith -Wformat-security -Wmissing-format-attribute -Wformat=1 -Wwrite-strings -Wcast-align -Wno-long-long -Woverloaded-virtual -Wnon-virtual-dtor -Wcast-qual -Wno-suggest-attribute=format
+ERRORS_PRE_COMPILE = -W -Wall -Wextra -Wunused -Wcast-align -Werror -pedantic -pedantic-errors -Wfloat-equal -Wpointer-arith -Wformat-security -Wmissing-format-attribute -Wformat=2 -Wwrite-strings -Wcast-align -Wno-long-long -Woverloaded-virtual -Wnon-virtual-dtor -Wcast-qual -Wno-suggest-attribute=format -Wno-unused-result -Wuninitialized 
 ERRORS_POST_COMPILE = -fsanitize=address -fstack-protector-all -g
 ERRORS = $(ERRORS_PRE_COMPILE) $(ERRORS_POST_COMPILE)
 
+EF = $(ERRORS_PRE_COMPILE)
 
-FAST_FLAGS = -Os -ffast-math -mfpmath=sse
+FAST_FLAGS = -O3 -ffast-math -mfpmath=sse
 OPTIMIZE = $(FAST_FLAGS)
-ARCH_FAST = -mfpmath=sse -fno-exceptions -mtune=generic -march=native
+ARCH_FAST = -mfpmath=sse -fno-exceptions -mtune=generic 
 
 
 LIBNAME = -DLIBNAME=\"non_intrin_aux_accurate.so\"
@@ -16,13 +16,13 @@ DO_FORCE_NON_INTRIN = -DDO_FORCE_NON_INTRIN=0
 DD = $(DO_FORCE_NON_INTRIN) $(LIBNAME)
 
 
-LINUX_FLAGS = $(ERRORS_PRE_COMPILE) -g
+LINUX_FLAGS =
 
 PROF_FLAGS = -pg
 
-INTRIN = -mfpmath=sse -fno-exceptions -mtune=generic -march=corei7-avx -mfma -mavx
+INTRIN = -march=corei7-avx -mfma -mavx
 DYN_LIB = -ldl
-CFLAGS = $(ARCH_FAST) $(LINUX_FLAGS)
+CFLAGS = $(ARCH_FAST) $(OPTIMIZE)
 
 current: a.out
 
@@ -32,23 +32,23 @@ matrix.o: matrix.cpp
 GJ_solve.o: GJ_solve.cpp
 
 accurate_solve_GJ.o: accurate_solve_GJ.cpp non_intrin_aux_accurate.so
-	g++ -c -O2 $(ARCH_FAST) $(DD) -fno-fast-math  $< -o $@
+	$(COMPILER) -c -O2 $(EF) $(DD) -fno-fast-math  $< -o $@
 non_intrin_aux_accurate.so: non_intrin_aux.cpp
-	g++ -shared -O2 $(ARCH_FAST) -fno-fast-math $< -o $@
+	$(COMPILER) -shared -O2 $(EF) -fno-fast-math $< -o $@
 
 aux_matrix_funcs.o: aux_matrix_funcs.cpp
 
 non_intrin_aux.o: non_intrin_aux.cpp
-	g++ -c $(OPTIMIZE) $(ARCH_FAST) $< -o $@
+	$(COMPILER) -c $(EF) $(OPTIMIZE) $(ARCH_FAST) $< -o $@
 intrin_aux.o: intrin_aux.cpp
-	g++ -c $(OPTIMIZE) $(INTRIN) $(ARCH_FAST) $< -o $@
+	$(COMPILER) -c $(EF) $(OPTIMIZE) $(INTRIN) $(ARCH_FAST) $< -o $@
 
 a.out: main.o matrix.o aux_matrix_funcs.o intrin_aux.o non_intrin_aux.o accurate_solve_GJ.o GJ_solve.o
-	g++ $(DD) $(CFLAGS) $(DYN_LIB) $^ -o $@
+	$(COMPILER) $(EF) $(DD) $(CFLAGS) $^ $(DYN_LIB) -o $@
 	rm -f *.o
 
 %.o: %.cpp
-	g++ -c $(DD) $(CFLAGS) $< -o $@
+	$(COMPILER) -c $(EF) $(DD) $(CFLAGS) $< -o $@
 
 clean:
 	rm -f *.out

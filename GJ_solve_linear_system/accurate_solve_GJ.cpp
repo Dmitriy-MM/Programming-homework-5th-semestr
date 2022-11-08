@@ -5,12 +5,17 @@
 #include "GJ_solve_core.cpp"
 
 int
-accurate_solve_GJ (char *libname, int n, int m, double norma, double *A, double *B_vec, double *b1, double *b2, double *b3, double *b_vec, double *b_vec2)
+accurate_solve_GJ (char *libname, int n, int m, double norma, double *A, double *B_vec, double *vec_buf, double *b1, double *b2, double *b3, double *b_vec, double *b_vec2, int * seq)
 {
   const int LEN = 4096;
   char full_path_buf[LEN] = { '\0' };
   char full_path_buf2[LEN] = { '\0' };
-  readlink ("/proc/self/exe", full_path_buf2, LEN);
+  ssize_t len = readlink ("/proc/self/exe", full_path_buf2, LEN);
+  if (len == -1)
+    {
+      fprintf (stderr, "Can't read process name from /proc/self/exe\n");
+      return solve_GJ (n, m, norma, A, B_vec, vec_buf, b1, b2, b3, b_vec, b_vec2, seq);
+    }
   size_t end = strlen (full_path_buf2);
   for (; end > 0; end--)
     if ((full_path_buf2[end] == '/') && (end - 1 > 0) && (full_path_buf2[end] != '\\'))
@@ -24,7 +29,7 @@ accurate_solve_GJ (char *libname, int n, int m, double norma, double *A, double 
   if (handle == nullptr)
     {
       fprintf (stderr, "Can't load the library %s\n", full_path_buf);
-      return solve_GJ (n, m, norma, A, B_vec, b1, b2, b3, b_vec, b_vec2);
+      return solve_GJ (n, m, norma, A, B_vec, vec_buf, b1, b2, b3, b_vec, b_vec2, seq);
     }
 
   void *ptrs[8] = { nullptr };
@@ -47,7 +52,7 @@ accurate_solve_GJ (char *libname, int n, int m, double norma, double *A, double 
   mult_block_on_vec = (void (*) (double *, double *, double *, int))dlsym (handle, "non_intrin_mult_block_on_vec");
   mult_block_on_vec_sub = (void (*) (double *, double *, double *, int))dlsym (handle, "non_intrin_mult_block_on_vec_sub");
 
-  int ret = solve_GJ (n, m, norma, A, B_vec, b1, b2, b3, b_vec, b_vec2, 0);
+  int ret = solve_GJ (n, m, norma, A, B_vec, vec_buf, b1, b2, b3, b_vec, b_vec2, seq, 0);
   dlclose (handle);
 
   mult_blocks_m = (void (*) (double *, double *, double *, int))ptrs[0];

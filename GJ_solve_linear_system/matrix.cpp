@@ -135,6 +135,20 @@ calc_residual_vec (double *vec, int n)
 }
 
 double
+calc_matrix_norm_inf_block (double *arr, int n, int m)
+{
+  double sum_max = -1;
+  for (int i = 0; i < n; i++)
+    {
+      double sum = 0;
+      for (int j = 0; j < n; j++)
+        sum += st_abs (arr[get_pos_bs(i, j, n, m)]);
+      sum_max = sum_max < sum ? sum : sum_max;
+    }
+  return sum_max;
+}
+
+double
 calc_matrix_norm_inf (double *arr, int n, int m)
 {
   double sum_max = -1;
